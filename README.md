@@ -6,7 +6,9 @@ A Bayesian ELO rating system for NCAA Men's Basketball that maintains full proba
 
 ![ELO Distributions](elo_distributions.png)
 
-The chart above shows the probability distributions for the top 20 teams early in the 2025-26 season. Key observations:
+> **Auto-updated daily** via GitHub Actions. Rankings reflect games through the previous day.
+
+The chart above shows the probability distributions for the top 20 teams. Key observations:
 - **Duke** leads with mean ELO ~2100, followed by Iowa State and Michigan
 - All distributions are relatively wide (StdDev 160-260) due to limited games played
 - As the season progresses, distributions will narrow as more data becomes available

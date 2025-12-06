@@ -84,8 +84,18 @@ for i, team in enumerate(teams):
 # Styling
 ax.set_xlabel('ELO Rating', fontsize=14, fontweight='bold')
 ax.set_ylabel('Probability Density (scaled)', fontsize=14, fontweight='bold')
-today = datetime.now().strftime('%B %d, %Y')
-ax.set_title(f'NCAA Men\'s Basketball - Bayesian ELO Distributions (2025-26 Season)\nTop 20 Teams • Updated {today}',
+# Determine season based on current date
+now = datetime.now()
+if now.month >= 11:
+    season_year = now.year + 1
+elif now.month <= 4:
+    season_year = now.year
+else:
+    season_year = now.year  # Off-season, show previous
+
+season_str = f"{season_year-1}-{str(season_year)[2:]}"
+today = now.strftime('%B %d, %Y')
+ax.set_title(f'NCAA Men\'s Basketball - Bayesian ELO Distributions ({season_str} Season)\nTop 20 Teams • Updated {today}',
              fontsize=16, fontweight='bold', pad=20)
 
 # Legend - two columns for readability

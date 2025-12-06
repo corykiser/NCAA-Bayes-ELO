@@ -1,0 +1,79 @@
+name: Update Rankings
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC (1 AM EST / 10 PM PST)
+    # Most games are finished by then
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install numpy scipy matplotlib
+
+      - name: Build Go binary
+        run: go build -o ncaa-bayes-elo
+
+      - name: Determine current season
+        id: season
+        run: |
+          # Season year is the spring year (Nov-Apr)
+          # If we're in Nov or Dec, season = current year + 1
+          # Otherwise season = current year
+          MONTH=$(date +%m)
+          YEAR=$(date +%Y)
+          if [ "$MONTH" -ge 11 ]; then
+            SEASON=$((YEAR + 1))
+          elif [ "$MONTH" -le 4 ]; then
+            SEASON=$YEAR
+          else
+            # Off-season (May-Oct), use previous season
+            SEASON=$YEAR
+          fi
+          echo "season=$SEASON" >> $GITHUB_OUTPUT
+          echo "Determined season: $SEASON"
+
+      - name: Fetch games and generate rankings
+        run: |
+          ./ncaa-bayes-elo -season ${{ steps.season.outputs.season }} -top 20 -format json -output top20.json -no-cache
+          echo "Generated rankings for season ${{ steps.season.outputs.season }}"
+
+      - name: Generate chart
+        run: python3 generate_plot.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected"
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Auto-update rankings for $(date +'%Y-%m-%d')"
+          git push
