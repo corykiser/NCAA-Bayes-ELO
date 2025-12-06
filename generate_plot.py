@@ -41,8 +41,8 @@ colors = [
 # Line styles for additional differentiation
 line_styles = ['-', '--', '-.', ':']
 
-# X-axis range (ELO values)
-x = np.linspace(2100, 3100, 500)
+# X-axis range (ELO values) - adjusted for normal prior
+x = np.linspace(1400, 2500, 500)
 
 # Plot each team's distribution
 for i, team in enumerate(teams):
@@ -95,7 +95,7 @@ ax.grid(True, alpha=0.3, linestyle='-')
 ax.set_axisbelow(True)
 
 # Set axis limits
-ax.set_xlim(2100, 3100)
+ax.set_xlim(1400, 2500)
 ax.set_ylim(0, ax.get_ylim()[1] * 1.05)
 
 # Add annotation explaining the chart

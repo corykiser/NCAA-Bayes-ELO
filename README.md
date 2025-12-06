@@ -7,9 +7,9 @@ A Bayesian ELO rating system for NCAA Men's Basketball that maintains full proba
 ![ELO Distributions](elo_distributions.png)
 
 The chart above shows the probability distributions for the top 20 teams. Key observations:
-- **Florida** has the highest mean ELO and a narrow distribution, indicating high confidence
-- **Kennesaw State** (#14) has an extremely wide distribution due to limited quality opponents
-- Teams with wider distributions have more uncertainty in their true strength
+- **Florida** has the highest mean ELO (~2200) and a relatively narrow distribution
+- **Villanova** (#16) and **Kansas State** (#19) have wider distributions due to more variable results
+- Teams with narrower distributions (Tennessee, Alabama) have more consistent performance
 
 ## Features
 
@@ -67,15 +67,15 @@ go build -o ncaa-bayes-elo
 
 ```
 NCAA Men's Basketball Bayesian ELO Rankings (2024-2025 Season)
-Generated: 2025-12-06 16:16:29
+Generated: 2025-12-06 16:34:53
 ====================================================================================================
 Rank Team                               Mean   StdDev     5th%    25th%   Median    75th%    95th%
 ----------------------------------------------------------------------------------------------------
-1    Florida Gators                   2918.5     60.4   2800.0   2885.0   2930.0   2965.0   2990.0
-2    Auburn Tigers                    2860.7     82.2   2715.0   2805.0   2870.0   2925.0   2980.0
-3    Houston Cougars                  2848.1     90.4   2685.0   2790.0   2855.0   2920.0   2980.0
-4    Alabama Crimson Tide             2804.2     89.4   2655.0   2745.0   2805.0   2870.0   2950.0
-5    Tennessee Volunteers             2799.3     92.9   2640.0   2735.0   2800.0   2865.0   2950.0
+1    Florida Gators                   2198.3     98.3   2045.0   2130.0   2195.0   2260.0   2365.0
+2    Houston Cougars                  2104.4     94.8   1955.0   2040.0   2100.0   2165.0   2265.0
+3    Auburn Tigers                    2098.1     89.4   1955.0   2035.0   2095.0   2155.0   2250.0
+4    Duke Blue Devils                 2049.5    106.8   1880.0   1975.0   2045.0   2120.0   2230.0
+5    Tennessee Volunteers             2028.4     85.9   1890.0   1970.0   2025.0   2085.0   2170.0
 ...
 ```
 
@@ -106,7 +106,7 @@ Teams with high StdDev have more uncertain ratings, often due to fewer games pla
 
 ### Bayesian ELO Algorithm
 
-1. **Initialize**: Each team starts with a uniform prior distribution over ELO values (0-3000)
+1. **Initialize**: Each team starts with a normal prior distribution (mean=1500, std=300)
 
 2. **For each game**:
    - Compute joint distribution of both teams' ELOs

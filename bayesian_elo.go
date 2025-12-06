@@ -12,7 +12,8 @@ const (
 	ELOMin            = 0.0    // Minimum ELO value
 	ELOMax            = 3000.0 // Maximum ELO value
 	ELOStep           = 5.0    // Step size for discretization
-	InitialMean       = 1500.0 // Initial ELO mean
+	PriorMean         = 1500.0 // Prior distribution mean
+	PriorStdDev       = 300.0  // Prior distribution standard deviation
 )
 
 // Distribution represents a discrete probability distribution over ELO values
@@ -21,19 +22,24 @@ type Distribution struct {
 	Probs  []float64 // Probabilities
 }
 
-// NewUniformDistribution creates a uniform prior distribution
-func NewUniformDistribution() *Distribution {
+// NewNormalPrior creates a truncated normal prior distribution centered at 1500
+func NewNormalPrior() *Distribution {
 	n := int((ELOMax - ELOMin) / ELOStep)
 	d := &Distribution{
 		Values: make([]float64, n),
 		Probs:  make([]float64, n),
 	}
 
-	prob := 1.0 / float64(n)
+	// Calculate normal distribution probabilities (truncated at ELOMin and ELOMax)
 	for i := 0; i < n; i++ {
 		d.Values[i] = ELOMin + float64(i)*ELOStep
-		d.Probs[i] = prob
+		// Normal PDF: exp(-0.5 * ((x - mean) / std)^2)
+		z := (d.Values[i] - PriorMean) / PriorStdDev
+		d.Probs[i] = math.Exp(-0.5 * z * z)
 	}
+
+	// Normalize so probabilities sum to 1
+	d.Normalize()
 
 	return d
 }
@@ -131,7 +137,7 @@ func NewBayesianELO() *BayesianELO {
 	}
 }
 
-// getOrCreateTeam gets an existing team or creates a new one with uniform prior
+// getOrCreateTeam gets an existing team or creates a new one with normal prior
 func (b *BayesianELO) getOrCreateTeam(teamID, teamName string) *TeamRating {
 	if team, exists := b.Teams[teamID]; exists {
 		return team
@@ -140,7 +146,7 @@ func (b *BayesianELO) getOrCreateTeam(teamID, teamName string) *TeamRating {
 	team := &TeamRating{
 		TeamID:   teamID,
 		TeamName: teamName,
-		Dist:     NewUniformDistribution(),
+		Dist:     NewNormalPrior(),
 	}
 	b.Teams[teamID] = team
 	return team
