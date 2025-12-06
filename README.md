@@ -62,6 +62,8 @@ go build -o ncaa-bayes-elo
 | `-output` | stdout | Output file path |
 | `-team` | | Show detailed distribution for team ID |
 | `-predict` | | Predict matchup: `teamID1,teamID2` |
+| `-no-cache` | `false` | Bypass cache and fetch fresh data |
+| `-clear-cache` | `false` | Clear cached data before running |
 
 ## Sample Output
 
@@ -95,12 +97,18 @@ Teams with high StdDev have more uncertain ratings, often due to fewer games pla
 ### ESPN API (Default)
 - Undocumented but reliable JSON API
 - No authentication required
-- Rate limited by politeness (100ms delay between requests)
+- Parallel fetching with 10 concurrent workers
 
 ### NCAA.com API
 - Community wrapper by [henrygd](https://github.com/henrygd/ncaa-api)
 - Covers all NCAA sports
-- Rate limited to 5 req/sec
+- Parallel fetching with 5 concurrent workers (API rate limit)
+
+### Caching
+- Season data is cached locally after first fetch
+- Completed seasons are cached indefinitely
+- Current season cache expires daily (to pick up new games)
+- Use `-no-cache` to force fresh data or `-clear-cache` to reset
 
 ## How It Works
 
@@ -131,8 +139,9 @@ A lower K factor produces better-calibrated probabilities by avoiding overconfid
 ncaa-bayes-elo-go/
 ├── main.go           # CLI and output formatting
 ├── bayesian_elo.go   # Core Bayesian ELO algorithm
-├── espn_client.go    # ESPN API client
-├── ncaa_client.go    # NCAA API client
+├── espn_client.go    # ESPN API client (with goroutines)
+├── ncaa_client.go    # NCAA API client (with goroutines)
+├── cache.go          # Local caching for season data
 ├── go.mod
 └── README.md
 ```

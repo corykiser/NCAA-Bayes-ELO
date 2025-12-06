@@ -42,6 +42,8 @@ func main() {
 	showAll := flag.Bool("all", false, "Show all teams, not just top N")
 	teamID := flag.String("team", "", "Show detailed distribution for specific team ID")
 	predict := flag.String("predict", "", "Predict matchup: 'teamID1,teamID2'")
+	noCache := flag.Bool("no-cache", false, "Bypass cache and fetch fresh data")
+	clearCache := flag.Bool("clear-cache", false, "Clear cached data before running")
 
 	flag.Parse()
 
@@ -51,25 +53,56 @@ func main() {
 	fmt.Printf("Season: %d-%d\n", *season-1, *season)
 	fmt.Printf("Data Source: %s\n\n", *dataSource)
 
-	// Fetch games
-	var games []Game
-	var err error
-
-	switch *dataSource {
-	case "espn":
-		client := NewESPNClient()
-		games, err = client.GetSeason(*season)
-	case "ncaa":
-		client := NewNCAAClient()
-		games, err = client.GetSeason(*season)
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown data source: %s\n", *dataSource)
-		os.Exit(1)
+	// Initialize cache
+	cache, err := NewCache()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not initialize cache: %v\n", err)
 	}
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error fetching games: %v\n", err)
-		os.Exit(1)
+	// Clear cache if requested
+	if *clearCache && cache != nil {
+		if err := cache.Clear(*season, *dataSource); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not clear cache: %v\n", err)
+		} else {
+			fmt.Println("Cache cleared")
+		}
+	}
+
+	// Fetch games (with caching)
+	var games []Game
+
+	// Try cache first
+	if !*noCache && cache != nil {
+		if cachedGames, ok := cache.Get(*season, *dataSource); ok {
+			games = cachedGames
+		}
+	}
+
+	// Fetch from API if not cached
+	if games == nil {
+		switch *dataSource {
+		case "espn":
+			client := NewESPNClient()
+			games, err = client.GetSeason(*season)
+		case "ncaa":
+			client := NewNCAAClient()
+			games, err = client.GetSeason(*season)
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown data source: %s\n", *dataSource)
+			os.Exit(1)
+		}
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error fetching games: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Cache the results
+		if cache != nil {
+			if err := cache.Put(*season, *dataSource, games); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: could not cache games: %v\n", err)
+			}
+		}
 	}
 
 	// Filter to completed games only

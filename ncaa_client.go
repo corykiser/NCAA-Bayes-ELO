@@ -6,7 +6,12 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
+)
+
+const (
+	ncaaMaxConcurrentRequests = 5 // NCAA API limits to 5 req/sec
 )
 
 const (
@@ -96,23 +101,77 @@ func (c *NCAAClient) GetScoreboard(year, month, day int) ([]Game, error) {
 	return c.parseGames(scoreboardResp.Games, year, month, day), nil
 }
 
-// GetScoreboardRange fetches games for a date range
-func (c *NCAAClient) GetScoreboardRange(startDate, endDate time.Time) ([]Game, error) {
-	var allGames []Game
+// ncaaDateResult holds the result of fetching a single date
+type ncaaDateResult struct {
+	date  time.Time
+	games []Game
+	err   error
+}
 
+// GetScoreboardRange fetches games for a date range using parallel requests
+func (c *NCAAClient) GetScoreboardRange(startDate, endDate time.Time) ([]Game, error) {
+	// Build list of dates to fetch
+	var dates []time.Time
 	current := startDate
 	for !current.After(endDate) {
-		games, err := c.GetScoreboard(current.Year(), int(current.Month()), current.Day())
-		if err != nil {
-			fmt.Printf("Warning: failed to fetch NCAA games for %s: %v\n", current.Format("2006-01-02"), err)
+		dates = append(dates, current)
+		current = current.AddDate(0, 0, 1)
+	}
+
+	fmt.Printf("Fetching %d days of games using %d parallel workers...\n", len(dates), ncaaMaxConcurrentRequests)
+
+	// Channel for dates to process
+	dateChan := make(chan time.Time, len(dates))
+	for _, d := range dates {
+		dateChan <- d
+	}
+	close(dateChan)
+
+	// Channel for results
+	resultChan := make(chan ncaaDateResult, len(dates))
+
+	// Start worker goroutines
+	var wg sync.WaitGroup
+	for i := 0; i < ncaaMaxConcurrentRequests; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for date := range dateChan {
+				games, err := c.GetScoreboard(date.Year(), int(date.Month()), date.Day())
+				resultChan <- ncaaDateResult{date: date, games: games, err: err}
+				// Rate limiting - NCAA API limits to 5 req/sec
+				time.Sleep(200 * time.Millisecond)
+			}
+		}()
+	}
+
+	// Close result channel when all workers done
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results into a map by date
+	gamesByDate := make(map[time.Time][]Game)
+	errorCount := 0
+	for result := range resultChan {
+		if result.err != nil {
+			errorCount++
 		} else {
+			gamesByDate[result.date] = result.games
+		}
+	}
+
+	if errorCount > 0 {
+		fmt.Printf("Warning: %d dates had fetch errors\n", errorCount)
+	}
+
+	// Combine games in chronological order
+	var allGames []Game
+	for _, date := range dates {
+		if games, ok := gamesByDate[date]; ok {
 			allGames = append(allGames, games...)
 		}
-
-		current = current.AddDate(0, 0, 1)
-
-		// Rate limiting - NCAA API limits to 5 req/sec
-		time.Sleep(250 * time.Millisecond)
 	}
 
 	return allGames, nil

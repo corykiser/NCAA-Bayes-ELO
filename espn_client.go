@@ -6,7 +6,12 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
+)
+
+const (
+	maxConcurrentRequests = 10 // Max parallel API requests
 )
 
 const (
@@ -129,25 +134,78 @@ func (c *ESPNClient) GetScoreboard(date string) ([]Game, error) {
 	return c.parseEvents(scoreboardResp.Events), nil
 }
 
-// GetScoreboardRange fetches games for a date range
-func (c *ESPNClient) GetScoreboardRange(startDate, endDate time.Time) ([]Game, error) {
-	var allGames []Game
+// dateResult holds the result of fetching a single date
+type dateResult struct {
+	date  time.Time
+	games []Game
+	err   error
+}
 
+// GetScoreboardRange fetches games for a date range using parallel requests
+func (c *ESPNClient) GetScoreboardRange(startDate, endDate time.Time) ([]Game, error) {
+	// Build list of dates to fetch
+	var dates []time.Time
 	current := startDate
 	for !current.After(endDate) {
-		dateStr := current.Format("20060102")
-		games, err := c.GetScoreboard(dateStr)
-		if err != nil {
-			// Log error but continue
-			fmt.Printf("Warning: failed to fetch games for %s: %v\n", dateStr, err)
+		dates = append(dates, current)
+		current = current.AddDate(0, 0, 1)
+	}
+
+	fmt.Printf("Fetching %d days of games using %d parallel workers...\n", len(dates), maxConcurrentRequests)
+
+	// Channel for dates to process
+	dateChan := make(chan time.Time, len(dates))
+	for _, d := range dates {
+		dateChan <- d
+	}
+	close(dateChan)
+
+	// Channel for results
+	resultChan := make(chan dateResult, len(dates))
+
+	// Start worker goroutines
+	var wg sync.WaitGroup
+	for i := 0; i < maxConcurrentRequests; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for date := range dateChan {
+				dateStr := date.Format("20060102")
+				games, err := c.GetScoreboard(dateStr)
+				resultChan <- dateResult{date: date, games: games, err: err}
+				// Small delay to be polite to API
+				time.Sleep(50 * time.Millisecond)
+			}
+		}()
+	}
+
+	// Close result channel when all workers done
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results into a map by date
+	gamesByDate := make(map[time.Time][]Game)
+	errorCount := 0
+	for result := range resultChan {
+		if result.err != nil {
+			errorCount++
 		} else {
+			gamesByDate[result.date] = result.games
+		}
+	}
+
+	if errorCount > 0 {
+		fmt.Printf("Warning: %d dates had fetch errors\n", errorCount)
+	}
+
+	// Combine games in chronological order
+	var allGames []Game
+	for _, date := range dates {
+		if games, ok := gamesByDate[date]; ok {
 			allGames = append(allGames, games...)
 		}
-
-		current = current.AddDate(0, 0, 1)
-
-		// Rate limiting - be nice to ESPN
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	return allGames, nil
