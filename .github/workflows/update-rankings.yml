@@ -34,21 +34,32 @@ jobs:
       - name: Determine current season
         id: season
         run: |
-          # Season year is the spring year (Nov-Apr)
-          # If we're in Nov or Dec, season = current year + 1
-          # Otherwise season = current year
+          # NCAA basketball season runs Nov 1 - Apr 15
+          # Season is named by the spring year (e.g., 2025-26 season = "2026")
+          #
+          # Timeline example:
+          #   Nov 2025 - Apr 2026: Season 2026 (active)
+          #   May 2026 - Oct 2026: Off-season, display Season 2026 (completed)
+          #   Nov 2026 - Apr 2027: Season 2027 (active)
+          #
           MONTH=$(date +%m)
           YEAR=$(date +%Y)
+
           if [ "$MONTH" -ge 11 ]; then
+            # Nov-Dec: new season just started, season = next year
             SEASON=$((YEAR + 1))
           elif [ "$MONTH" -le 4 ]; then
+            # Jan-Apr: season in progress, season = current year
             SEASON=$YEAR
           else
-            # Off-season (May-Oct), use previous season
+            # May-Oct: off-season, show the completed season from spring
+            # e.g., in July 2026, show season 2026 (which ended Apr 2026)
             SEASON=$YEAR
           fi
+
           echo "season=$SEASON" >> $GITHUB_OUTPUT
-          echo "Determined season: $SEASON"
+          PREV_YEAR=$((SEASON - 1))
+          echo "Determined season: $PREV_YEAR-$SEASON (season code: $SEASON)"
 
       - name: Fetch games and generate rankings
         run: |
@@ -57,6 +68,17 @@ jobs:
 
       - name: Generate chart
         run: python3 generate_plot.py
+
+      - name: Update README season reference
+        run: |
+          SEASON=${{ steps.season.outputs.season }}
+          PREV_YEAR=$((SEASON - 1))
+          SEASON_STR="${PREV_YEAR}-${SEASON: -2}"
+
+          # Update the season in README header
+          sed -i "s/## Current Rankings ([0-9]\{4\}-[0-9]\{2\} Season)/## Current Rankings ($SEASON_STR Season)/" README.md
+
+          echo "Updated README to reference $SEASON_STR season"
 
       - name: Check for changes
         id: changes

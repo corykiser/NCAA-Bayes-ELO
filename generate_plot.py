@@ -85,13 +85,24 @@ for i, team in enumerate(teams):
 ax.set_xlabel('ELO Rating', fontsize=14, fontweight='bold')
 ax.set_ylabel('Probability Density (scaled)', fontsize=14, fontweight='bold')
 # Determine season based on current date
+# NCAA basketball season runs Nov 1 - Apr 15
+# Season is named by the spring year (e.g., 2025-26 season = "2026")
+#
+# Timeline example:
+#   Nov 2025 - Apr 2026: Season 2026 (active)
+#   May 2026 - Oct 2026: Off-season, display Season 2026 (completed)
+#   Nov 2026 - Apr 2027: Season 2027 (active)
+#
 now = datetime.now()
 if now.month >= 11:
+    # Nov-Dec: new season just started
     season_year = now.year + 1
 elif now.month <= 4:
+    # Jan-Apr: season in progress
     season_year = now.year
 else:
-    season_year = now.year  # Off-season, show previous
+    # May-Oct: off-season, show the completed season from spring
+    season_year = now.year
 
 season_str = f"{season_year-1}-{str(season_year)[2:]}"
 today = now.strftime('%B %d, %Y')
