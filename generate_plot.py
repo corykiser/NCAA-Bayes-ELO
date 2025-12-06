@@ -41,8 +41,8 @@ colors = [
 # Line styles for additional differentiation
 line_styles = ['-', '--', '-.', ':']
 
-# X-axis range (ELO values) - adjusted for normal prior
-x = np.linspace(1400, 2500, 500)
+# X-axis range (ELO values) - adjusted for early season with higher uncertainty
+x = np.linspace(1200, 2600, 500)
 
 # Plot each team's distribution
 for i, team in enumerate(teams):
@@ -83,7 +83,7 @@ for i, team in enumerate(teams):
 # Styling
 ax.set_xlabel('ELO Rating', fontsize=14, fontweight='bold')
 ax.set_ylabel('Probability Density (scaled)', fontsize=14, fontweight='bold')
-ax.set_title('NCAA Men\'s Basketball - Bayesian ELO Distributions (2024-25 Season)\nTop 20 Teams',
+ax.set_title('NCAA Men\'s Basketball - Bayesian ELO Distributions (2025-26 Season)\nTop 20 Teams',
              fontsize=16, fontweight='bold', pad=20)
 
 # Legend - two columns for readability
@@ -95,7 +95,7 @@ ax.grid(True, alpha=0.3, linestyle='-')
 ax.set_axisbelow(True)
 
 # Set axis limits
-ax.set_xlim(1400, 2500)
+ax.set_xlim(1200, 2600)
 ax.set_ylim(0, ax.get_ylim()[1] * 1.05)
 
 # Add annotation explaining the chart

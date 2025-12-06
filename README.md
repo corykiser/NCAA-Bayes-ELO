@@ -2,14 +2,25 @@
 
 A Bayesian ELO rating system for NCAA Men's Basketball that maintains full probability distributions over team strengths rather than point estimates.
 
-## Current Rankings (2024-25 Season)
+## Current Rankings (2025-26 Season)
 
 ![ELO Distributions](elo_distributions.png)
 
-The chart above shows the probability distributions for the top 20 teams. Key observations:
-- **Florida** has the highest mean ELO (~2200) and a relatively narrow distribution
-- **Villanova** (#16) and **Kansas State** (#19) have wider distributions due to more variable results
-- Teams with narrower distributions (Tennessee, Alabama) have more consistent performance
+The chart above shows the probability distributions for the top 20 teams early in the 2025-26 season. Key observations:
+- **Duke** leads with mean ELO ~2100, followed by Iowa State and Michigan
+- All distributions are relatively wide (StdDev 160-260) due to limited games played
+- As the season progresses, distributions will narrow as more data becomes available
+
+<details>
+<summary>2024-25 Season (Archived)</summary>
+
+![ELO Distributions 2024-25](elo_distributions_2024-25.png)
+
+End-of-season observations:
+- **Florida** finished #1 with mean ELO ~2200 and a narrow distribution
+- **Villanova** and **Kansas State** had wider distributions due to variable results
+- Teams with narrower distributions (Tennessee, Alabama) showed more consistent performance
+</details>
 
 ## Features
 
@@ -68,16 +79,16 @@ go build -o ncaa-bayes-elo
 ## Sample Output
 
 ```
-NCAA Men's Basketball Bayesian ELO Rankings (2024-2025 Season)
-Generated: 2025-12-06 16:34:53
+NCAA Men's Basketball Bayesian ELO Rankings (2025-2026 Season)
+Generated: 2025-12-06 17:02:28
 ====================================================================================================
 Rank Team                               Mean   StdDev     5th%    25th%   Median    75th%    95th%
 ----------------------------------------------------------------------------------------------------
-1    Florida Gators                   2198.3     98.3   2045.0   2130.0   2195.0   2260.0   2365.0
-2    Houston Cougars                  2104.4     94.8   1955.0   2040.0   2100.0   2165.0   2265.0
-3    Auburn Tigers                    2098.1     89.4   1955.0   2035.0   2095.0   2155.0   2250.0
-4    Duke Blue Devils                 2049.5    106.8   1880.0   1975.0   2045.0   2120.0   2230.0
-5    Tennessee Volunteers             2028.4     85.9   1890.0   1970.0   2025.0   2085.0   2170.0
+1    Duke Blue Devils                 2099.2    183.7   1810.0   1970.0   2090.0   2220.0   2415.0
+2    Iowa State Cyclones              2070.1    188.1   1775.0   1940.0   2065.0   2190.0   2390.0
+3    Michigan Wolverines              2054.0    193.6   1745.0   1920.0   2050.0   2180.0   2380.0
+4    Arizona Wildcats                 2018.8    197.1   1705.0   1885.0   2010.0   2145.0   2355.0
+5    Gonzaga Bulldogs                 1971.9    169.6   1700.0   1855.0   1965.0   2085.0   2260.0
 ...
 ```
 
