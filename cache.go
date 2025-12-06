@@ -58,25 +58,34 @@ func (c *Cache) Get(season int, source string) ([]Game, bool) {
 	}
 
 	// Check if cache is still valid
-	// For completed seasons (before current date), cache indefinitely
-	// For current season, cache is valid if fetched today
 	now := time.Now()
+	seasonStart := time.Date(season-1, time.November, 1, 0, 0, 0, 0, time.UTC)
 	seasonEnd := time.Date(season, time.April, 15, 0, 0, 0, 0, time.UTC)
 
+	// If season hasn't started yet, no games to fetch
+	if now.Before(seasonStart) {
+		fmt.Printf("Season %d hasn't started yet\n", season)
+		return nil, false
+	}
+
+	// For completed seasons, cache indefinitely
 	if now.After(seasonEnd) {
-		// Season is complete, cache is always valid
-		fmt.Printf("Using cached data for %d season (%d games)\n", season, len(entry.Games))
+		fmt.Printf("Using cached data for completed %d season (%d games)\n", season, len(entry.Games))
 		return entry.Games, true
 	}
 
-	// Current season - check if cache was fetched today
-	if entry.FetchedAt.Year() == now.Year() &&
-	   entry.FetchedAt.YearDay() == now.YearDay() {
+	// Current/ongoing season - check if new games might have been played
+	// Cache is valid only if fetched after the most recent midnight
+	// (games are typically completed by end of day)
+	lastMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	if entry.FetchedAt.After(lastMidnight) {
 		fmt.Printf("Using today's cached data for %d season (%d games)\n", season, len(entry.Games))
 		return entry.Games, true
 	}
 
-	// Cache is stale
+	// Cache is stale - new games may have been played
+	fmt.Printf("Cache is stale (fetched %s), fetching new data...\n", entry.FetchedAt.Format("2006-01-02 15:04"))
 	return nil, false
 }
 
