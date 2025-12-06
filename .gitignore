@@ -1,0 +1,14 @@
+# Build output
+ncaa-bayes-elo
+
+# Temporary data files
+top20.json
+rankings.json
+rankings.csv
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store

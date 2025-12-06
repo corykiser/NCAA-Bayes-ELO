@@ -2,6 +2,15 @@
 
 A Bayesian ELO rating system for NCAA Men's Basketball that maintains full probability distributions over team strengths rather than point estimates.
 
+## Current Rankings (2024-25 Season)
+
+![ELO Distributions](elo_distributions.png)
+
+The chart above shows the probability distributions for the top 20 teams. Key observations:
+- **Florida** has the highest mean ELO and a narrow distribution, indicating high confidence
+- **Kennesaw State** (#14) has an extremely wide distribution due to limited quality opponents
+- Teams with wider distributions have more uncertainty in their true strength
+
 ## Features
 
 - **Bayesian ELO**: Maintains probability distributions over team ELO ratings, quantifying uncertainty
