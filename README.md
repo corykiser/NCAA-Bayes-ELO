@@ -123,6 +123,27 @@ Teams with high StdDev have more uncertain ratings, often due to fewer games pla
 - Current season cache expires daily (to pick up new games)
 - Use `-no-cache` to force fresh data or `-clear-cache` to reset
 
+## Why Bayesian ELO?
+
+Traditional ELO gives each team a single number (e.g., "Duke is rated 1850"). But how confident are we in that number? A team that's played 20 games against tough opponents should have a more reliable rating than a team that's played 3 games against weak opponents.
+
+**Bayesian ELO solves this by tracking uncertainty:**
+
+| Approach | What it tells you | Example |
+|----------|-------------------|---------|
+| **Traditional ELO** | "Duke is rated 1850" | Just a number |
+| **Bayesian ELO** | "Duke is probably between 1750-1950, most likely around 1850" | A range with confidence |
+
+### Real-World Benefits
+
+1. **Better predictions**: When two teams with overlapping distributions play, we know it's a toss-up. Traditional ELO might show a 15-point difference that looks meaningful but isn't.
+
+2. **Early-season honesty**: In November, every team has wide distributions because we don't have much data yet. Traditional ELO pretends to know more than it does.
+
+3. **Upset detection**: If a low-ranked team has a wide distribution that overlaps with a high-ranked team, an "upset" isn't really an upset—we just didn't have enough information.
+
+4. **Resume strength**: Teams that beat opponents with narrow, high distributions gain more than teams that beat uncertain opponents.
+
 ## How It Works
 
 ### Bayesian ELO Algorithm
