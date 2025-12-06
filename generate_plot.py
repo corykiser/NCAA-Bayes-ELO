@@ -5,6 +5,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
+from datetime import datetime
 
 # Load team data
 with open('top20.json', 'r') as f:
@@ -83,7 +84,8 @@ for i, team in enumerate(teams):
 # Styling
 ax.set_xlabel('ELO Rating', fontsize=14, fontweight='bold')
 ax.set_ylabel('Probability Density (scaled)', fontsize=14, fontweight='bold')
-ax.set_title('NCAA Men\'s Basketball - Bayesian ELO Distributions (2025-26 Season)\nTop 20 Teams',
+today = datetime.now().strftime('%B %d, %Y')
+ax.set_title(f'NCAA Men\'s Basketball - Bayesian ELO Distributions (2025-26 Season)\nTop 20 Teams • Updated {today}',
              fontsize=16, fontweight='bold', pad=20)
 
 # Legend - two columns for readability
