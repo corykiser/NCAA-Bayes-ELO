@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 )
 
 // Tuned parameters from cross-validation
@@ -113,6 +114,7 @@ type BayesianELO struct {
 	Teams    map[string]*TeamRating
 	KFactor  float64
 	GameLog  []GameResult
+	logMutex sync.Mutex // Protects GameLog during parallel processing
 }
 
 // GameResult stores the result of processing a game
@@ -265,16 +267,222 @@ func (b *BayesianELO) ProcessGame(game Game) {
 	})
 }
 
-// ProcessGames processes multiple games in order
+// ProcessGames processes multiple games with parallelization where possible
 func (b *BayesianELO) ProcessGames(games []Game) {
 	// Sort games by date
 	sort.Slice(games, func(i, j int) bool {
 		return games[i].Date.Before(games[j].Date)
 	})
 
+	// Group games by date for batch processing
+	gamesByDate := make(map[string][]Game)
+	var dateOrder []string
+
 	for _, game := range games {
-		b.ProcessGame(game)
+		dateKey := game.Date.Format("2006-01-02")
+		if _, exists := gamesByDate[dateKey]; !exists {
+			dateOrder = append(dateOrder, dateKey)
+		}
+		gamesByDate[dateKey] = append(gamesByDate[dateKey], game)
 	}
+
+	// Process each day's games with parallelization
+	for _, dateKey := range dateOrder {
+		dayGames := gamesByDate[dateKey]
+		b.processGameBatchParallel(dayGames)
+	}
+}
+
+// processGameBatchParallel processes a batch of games from the same day
+// Games that don't share teams can be processed in parallel
+func (b *BayesianELO) processGameBatchParallel(games []Game) {
+	if len(games) == 0 {
+		return
+	}
+
+	// Pre-create all teams to avoid race conditions during parallel processing
+	for _, game := range games {
+		if !game.Completed || game.WinnerID == "" {
+			continue
+		}
+		b.getOrCreateTeam(game.HomeTeamID, game.HomeTeam)
+		b.getOrCreateTeam(game.AwayTeamID, game.AwayTeam)
+	}
+
+	processed := make([]bool, len(games))
+	remaining := len(games)
+
+	// Mark invalid games as already processed
+	for i, game := range games {
+		if !game.Completed || game.WinnerID == "" {
+			processed[i] = true
+			remaining--
+		}
+	}
+
+	for remaining > 0 {
+		// Find all games that can be processed in parallel (no shared teams)
+		var batch []int
+		teamsInBatch := make(map[string]bool)
+
+		for i, game := range games {
+			if processed[i] {
+				continue
+			}
+
+			// Check if this game shares any teams with games already in batch
+			homeID := game.HomeTeamID
+			awayID := game.AwayTeamID
+
+			if teamsInBatch[homeID] || teamsInBatch[awayID] {
+				// Conflict - can't process in parallel
+				continue
+			}
+
+			// Add to batch
+			batch = append(batch, i)
+			teamsInBatch[homeID] = true
+			teamsInBatch[awayID] = true
+		}
+
+		if len(batch) == 0 {
+			// Should never happen if remaining > 0
+			break
+		}
+
+		// Process batch in parallel
+		if len(batch) == 1 {
+			// Single game, no need for goroutines
+			b.ProcessGame(games[batch[0]])
+		} else {
+			var wg sync.WaitGroup
+			for _, idx := range batch {
+				wg.Add(1)
+				go func(gameIdx int) {
+					defer wg.Done()
+					b.processGameInternal(games[gameIdx])
+				}(idx)
+			}
+			wg.Wait()
+		}
+
+		// Mark as processed
+		for _, idx := range batch {
+			processed[idx] = true
+			remaining--
+		}
+	}
+}
+
+// processGameInternal is the thread-safe version of ProcessGame
+// It assumes the team already exists and uses fine-grained locking
+func (b *BayesianELO) processGameInternal(game Game) {
+	if !game.Completed || game.WinnerID == "" {
+		return
+	}
+
+	var winnerID, winnerName, loserID, loserName string
+	var homeAdv string
+
+	if game.HomeScore > game.AwayScore {
+		winnerID = game.HomeTeamID
+		winnerName = game.HomeTeam
+		loserID = game.AwayTeamID
+		loserName = game.AwayTeam
+		if game.NeutralSite {
+			homeAdv = "N"
+		} else {
+			homeAdv = "H"
+		}
+	} else {
+		winnerID = game.AwayTeamID
+		winnerName = game.AwayTeam
+		loserID = game.HomeTeamID
+		loserName = game.HomeTeam
+		if game.NeutralSite {
+			homeAdv = "N"
+		} else {
+			homeAdv = "A"
+		}
+	}
+
+	winner := b.Teams[winnerID]
+	loser := b.Teams[loserID]
+
+	// Record pre-game state
+	winnerPreMean := winner.Dist.Mean()
+	loserPreMean := loser.Dist.Mean()
+	preWinProb := b.winProbability(winnerPreMean - loserPreMean)
+
+	// Compute joint distribution and likelihood
+	n := len(winner.Dist.Values)
+	jointProbs := make([][]float64, n)
+	for i := range jointProbs {
+		jointProbs[i] = make([]float64, n)
+	}
+
+	// Build joint distribution (outer product of marginals)
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			jointProbs[i][j] = winner.Dist.Probs[i] * loser.Dist.Probs[j]
+		}
+	}
+
+	// Apply likelihood (winner won)
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			diff := winner.Dist.Values[i] - loser.Dist.Values[j]
+			likelihood := b.winProbability(diff)
+			jointProbs[i][j] *= likelihood
+		}
+	}
+
+	// Normalize joint
+	var totalProb float64
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			totalProb += jointProbs[i][j]
+		}
+	}
+	if totalProb > 0 {
+		for i := 0; i < n; i++ {
+			for j := 0; j < n; j++ {
+				jointProbs[i][j] /= totalProb
+			}
+		}
+	}
+
+	// Marginalize to get updated distributions
+	newWinnerProbs := make([]float64, n)
+	newLoserProbs := make([]float64, n)
+
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			newWinnerProbs[i] += jointProbs[i][j]
+			newLoserProbs[j] += jointProbs[i][j]
+		}
+	}
+
+	winner.Dist.Probs = newWinnerProbs
+	winner.Dist.Normalize()
+
+	loser.Dist.Probs = newLoserProbs
+	loser.Dist.Normalize()
+
+	// Log the game result (needs mutex since GameLog is shared)
+	b.logMutex.Lock()
+	b.GameLog = append(b.GameLog, GameResult{
+		Date:          game.Date.Format("2006-01-02"),
+		WinnerName:    winnerName,
+		WinnerID:      winnerID,
+		LoserName:     loserName,
+		LoserID:       loserID,
+		WinnerELO:     winnerPreMean,
+		LoserELO:      loserPreMean,
+		WinProb:       preWinProb,
+		HomeAdvantage: homeAdv,
+	})
+	b.logMutex.Unlock()
 }
 
 // GetRankings returns teams sorted by mean ELO
