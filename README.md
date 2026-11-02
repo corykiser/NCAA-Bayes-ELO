@@ -2,7 +2,7 @@
 
 A Bayesian ELO rating system for NCAA Men's Basketball that maintains full probability distributions over team strengths rather than point estimates.
 
-## Current Rankings (2025-26 Season)
+## Current Rankings (2026-27 Season)
 
 ![ELO Distributions](elo_distributions.png)
 
